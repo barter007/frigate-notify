@@ -6,16 +6,20 @@ import (
 	"time"
 
 	"github.com/0x2142/frigate-notify/config"
+	"github.com/0x2142/frigate-notify/frigate"
 	"github.com/0x2142/frigate-notify/models"
 	"github.com/0x2142/frigate-notify/notifier"
-	"github.com/0x2142/frigate-notify/util"
 	"github.com/rs/zerolog/log"
 )
 
 // processEvent handles preparing event for alerting
 func processEvent(event models.Event) {
 	if config.ConfigData.Alerts.General.RecheckDelay != 0 {
-		event = recheckEvent(event)
+		event, err := recheckEvent(event)
+		if err != nil {
+			log.Error().Err(err).Msgf("Cannot recheck event %s", event.ID)
+			return
+		}
 	}
 
 	config.Internal.Status.LastEvent = time.Now()
@@ -46,7 +50,7 @@ func processEvent(event models.Event) {
 	notifier.SendAlert([]models.Event{event})
 }
 
-func recheckEvent(event models.Event) models.Event {
+func recheckEvent(event models.Event) (*models.Event, error) {
 	delay := config.ConfigData.Alerts.General.RecheckDelay
 	log.Debug().
 		Str("event_id", event.ID).
@@ -58,18 +62,11 @@ func recheckEvent(event models.Event) models.Event {
 		Int("recheck_delay", delay).
 		Msg("Re-checking event details")
 
-	url := config.ConfigData.Frigate.Server + "/api/events/" + event.ID
-	response, err := util.HTTPGet(url, config.ConfigData.Frigate.Insecure, "", config.ConfigData.Frigate.Headers...)
+	response, err := frigate.GetEventOrReview(event.ID)
 	if err != nil {
-		config.Internal.Status.Health = "frigate webapi unreachable"
-		config.Internal.Status.Frigate.API = "unreachable"
-		log.Error().
-			Err(err).
-			Msgf("Cannot get event from %s", url)
+		return nil, err
 	}
-	config.Internal.Status.Health = "ok"
-	config.Internal.Status.Frigate.API = "ok"
 
 	json.Unmarshal([]byte(response), &event)
-	return event
+	return &event, nil
 }

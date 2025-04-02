@@ -12,9 +12,12 @@ type API struct {
 
 type Frigate struct {
 	Server       string              `fig:"server" json:"server" validate:"required" example:"http://192.0.2.10:5000" doc:"Server hostname, IP address, or URL for Frigate"`
+	AuthEnabled  bool                `fig:"auth_enabled" json:"auth_enabled,omitempty" enum:"true,false" doc:"Enable authentication for Frigate API" default:false`
+	Username     string              `fig:"username" json:"username,omitempty" doc:"Username for Frigate authentication using api/login endpoint" default:""`
+	Password     string              `fig:"password" json:"password,omitempty" doc:"Password for Frigate authentication using api/login endpoint" default:""`
 	Insecure     bool                `fig:"ignoressl" json:"ignoressl,omitempty" enum:"true,false" doc:"Ignore TLS/SSL errors" default:false`
 	PublicURL    string              `fig:"public_url" json:"public_url,omitempty" example:"https://frigate.test" doc:"Public/External-reachable URL for Frigate" default:""`
-	Headers      []map[string]string `fig:"headers" json:"headers,omitempty" doc:"HTTP headers to include with requests to Frigate"`
+	Headers      []map[string]string `fig:"headers" json:"headers,omitempty" doc:"HTTP headers to include with requests to Frigate. Ex.: using a proxy with basic auth"`
 	StartupCheck StartupCheck        `fig:"startup_check" json:"startup_check,omitempty" doc:"Check connectivity to Frigate at app startup"`
 	WebAPI       WebAPI              `fig:"webapi" json:"webapi,omitempty" doc:"Event collection via Frigate API"`
 	MQTT         MQTT                `fig:"mqtt" json:"mqtt,omitempty" doc:"Event collection via MQTT`

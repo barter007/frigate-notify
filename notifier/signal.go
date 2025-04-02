@@ -71,7 +71,7 @@ func SendSignalMessage(event models.Event, snapshot io.Reader, provider notifMet
 	}
 
 	url := profile.Server + "/v2/send"
-	_, err = util.HTTPPost(url, profile.Insecure, []byte(data), "")
+	_, _, err = util.HTTPPost(url, profile.Insecure, []byte(data), "")
 
 	if err != nil {
 		log.Warn().

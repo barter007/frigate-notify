@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/0x2142/frigate-notify/config"
+	"github.com/0x2142/frigate-notify/frigate"
 	"github.com/0x2142/frigate-notify/models"
 	"github.com/0x2142/frigate-notify/notifier"
 	"github.com/0x2142/frigate-notify/util"
@@ -16,7 +17,11 @@ import (
 // processReview handles querying detections under a review & preparing for sending an alert
 func processReview(review models.Review) {
 	if config.ConfigData.Alerts.General.RecheckDelay != 0 {
-		review = recheckReview(review)
+		review, err := recheckReview(review)
+		if err != nil {
+			log.Error().Err(err).Msgf("Cannot recheck review %s", review.ID)
+			return
+		}
 	}
 
 	config.Internal.Status.LastEvent = time.Now()
@@ -68,7 +73,7 @@ func processReview(review models.Review) {
 	for _, id := range review.Data.Detections {
 		url := fmt.Sprintf("%s/api/events/%s", config.ConfigData.Frigate.Server, id)
 
-		response, err := util.HTTPGet(url, config.ConfigData.Frigate.Insecure, "")
+		response, err := util.HTTPGet(url, config.ConfigData.Frigate.Insecure, "", nil)
 		if err != nil {
 			config.Internal.Status.Frigate.API = "unreachable"
 			log.Error().
@@ -122,7 +127,7 @@ func processReview(review models.Review) {
 	notifier.SendAlert(detections)
 }
 
-func recheckReview(review models.Review) models.Review {
+func recheckReview(review models.Review) (*models.Review, error) {
 	delay := config.ConfigData.Alerts.General.RecheckDelay
 	log.Debug().
 		Str("review_id", review.ID).
@@ -134,18 +139,11 @@ func recheckReview(review models.Review) models.Review {
 		Int("recheck_delay", delay).
 		Msg("Re-checking review details")
 
-	url := config.ConfigData.Frigate.Server + "/api/review/" + review.ID
-	response, err := util.HTTPGet(url, config.ConfigData.Frigate.Insecure, "", config.ConfigData.Frigate.Headers...)
+	response, err := frigate.GetEventOrReview(review.ID)
 	if err != nil {
-		config.Internal.Status.Health = "frigate webapi unreachable"
-		config.Internal.Status.Frigate.API = "unreachable"
-		log.Error().
-			Err(err).
-			Msgf("Cannot get event from %s", url)
+		return nil, err
 	}
-	config.Internal.Status.Health = "ok"
-	config.Internal.Status.Frigate.API = "ok"
 
 	json.Unmarshal([]byte(response), &review)
-	return review
+	return &review, nil
 }

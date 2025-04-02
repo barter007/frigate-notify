@@ -1,16 +1,13 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/0x2142/frigate-notify/models"
-	"github.com/0x2142/frigate-notify/util"
 	"github.com/rs/zerolog/log"
 )
 
@@ -18,8 +15,8 @@ func (c *Config) Validate() []string {
 	var validationErrors []string
 	log.Debug().Msg("Validating config file...")
 
-	// Check Frigate Connectivity
-	if results := c.validateFrigateConnectivity(); len(results) > 0 {
+	// Check Frigate Server Settings
+	if results := c.validateFrigateServerSettings(); len(results) > 0 {
 		validationErrors = append(validationErrors, results...)
 	}
 
@@ -197,11 +194,9 @@ func (c *Config) Validate() []string {
 func (c *Config) validateAppMode() []string {
 	var appErrors []string
 	if strings.ToLower(c.App.Mode) != "events" && strings.ToLower(c.App.Mode) != "reviews" {
-		appErrors = append(appErrors, "MQTT mode must be 'events' or 'reviews'")
+		appErrors = append(appErrors, "APP mode must be 'events' or 'reviews'")
 	}
-	if Internal.FrigateVersion < 14 && strings.ToLower(c.App.Mode) == "reviews" {
-		appErrors = append(appErrors, "Frigate must be version 0.14 or higher to use 'reviews' mode. Please use 'events' mode or update Frigate.")
-	}
+
 	log.Debug().Msgf("App mode: %v", c.App.Mode)
 	return appErrors
 }
@@ -253,14 +248,10 @@ func (c *Config) validateFrigatePolling() []string {
 	return pollingErrors
 }
 
-func (c *Config) validateFrigateConnectivity() []string {
-	var response []byte
-	var err error
+func (c *Config) validateFrigateServerSettings() []string {
 	var connectivityErrors []string
 
 	url := c.Frigate.Server
-	max_attempts := c.Frigate.StartupCheck.Attempts
-	interval := c.Frigate.StartupCheck.Interval
 
 	// Check if Frigate server URL contains protocol, assume HTTP if not specified
 	if !strings.Contains(url, "http://") && !strings.Contains(url, "https://") {
@@ -284,48 +275,6 @@ func (c *Config) validateFrigateConnectivity() []string {
 		connectivityErrors = append(connectivityErrors, msg)
 	}
 
-	// Test connectivity to Frigate
-	log.Debug().Msg("Checking connection to Frigate server...")
-	statsAPI := fmt.Sprintf("%s/api/stats", url)
-	current_attempt := 1
-	if max_attempts == 0 {
-		max_attempts = 5
-	}
-	if interval == 0 {
-		interval = 30
-	}
-	for current_attempt < max_attempts {
-		response, err = util.HTTPGet(statsAPI, c.Frigate.Insecure, "", c.Frigate.Headers...)
-		if err != nil {
-			Internal.Status.Frigate.API = "unreachable"
-			log.Warn().
-				Err(err).
-				Int("attempt", current_attempt).
-				Int("max_tries", max_attempts).
-				Int("interval", interval).
-				Msgf("Cannot reach Frigate server at %v", url)
-			time.Sleep(time.Duration(interval) * time.Second)
-			current_attempt += 1
-		} else {
-			break
-		}
-	}
-	if current_attempt == max_attempts {
-		Internal.Status.Frigate.API = "unreachable"
-		log.Error().
-			Err(err).
-			Msgf("Max attempts reached - Cannot reach Frigate server at %v", url)
-		connectivityErrors = append(connectivityErrors, "Max attempts reached - Cannot reach Frigate server at "+url)
-	}
-	var stats models.FrigateStats
-	json.Unmarshal([]byte(response), &stats)
-	log.Info().Msgf("Successfully connected to %v", url)
-	Internal.Status.Frigate.API = "ok"
-	if stats.Service.Version != "" {
-		log.Debug().Msgf("Frigate server is running version %v", stats.Service.Version)
-		// Save major version number
-		Internal.FrigateVersion, _ = strconv.Atoi(strings.Split(stats.Service.Version, ".")[1])
-	}
 	return connectivityErrors
 }
 

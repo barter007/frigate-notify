@@ -67,7 +67,7 @@ func SendMattermost(event models.Event, provider notifMeta) {
 		return
 	}
 
-	_, err = util.HTTPPost(profile.Webhook, profile.Insecure, []byte(data), "", headers...)
+	_, _, err = util.HTTPPost(profile.Webhook, profile.Insecure, []byte(data), "", headers...)
 
 	if err != nil {
 		log.Warn().

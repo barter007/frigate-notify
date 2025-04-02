@@ -36,7 +36,7 @@ func PostNotifTest(ctx context.Context, input *struct{}) (*NotifTestOutput, erro
 		params := "?include_thumbnails=0&limit=1"
 		url := config.ConfigData.Frigate.Server + uri + params
 
-		response, err := util.HTTPGet(url, config.ConfigData.Frigate.Insecure, "", config.ConfigData.Frigate.Headers...)
+		response, err := util.HTTPGet(url, config.ConfigData.Frigate.Insecure, "", nil, config.ConfigData.Frigate.Headers...)
 		if err != nil {
 			log.Error().
 				Err(err).

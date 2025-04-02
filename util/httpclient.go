@@ -27,7 +27,6 @@ func BuildHTTPParams(params ...map[string]string) string {
 				v = url.QueryEscape(v)
 				paramList = fmt.Sprintf("%s&%s=%s", paramList, k, v)
 			}
-
 		}
 	}
 
@@ -35,7 +34,7 @@ func BuildHTTPParams(params ...map[string]string) string {
 }
 
 // HTTPGet is a simple HTTP client function to return page body
-func HTTPGet(url string, insecure bool, params string, headers ...map[string]string) ([]byte, error) {
+func HTTPGet(url string, insecure bool, params string, cookies []*http.Cookie, headers ...map[string]string) ([]byte, error) {
 	// Append HTTP params if any
 	if len(params) > 0 {
 		url = url + params
@@ -53,6 +52,13 @@ func HTTPGet(url string, insecure bool, params string, headers ...map[string]str
 	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
+	}
+
+	// Add cookies
+	if len(cookies) > 0 {
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
+		}
 	}
 
 	// Add headers
@@ -81,6 +87,7 @@ func HTTPGet(url string, insecure bool, params string, headers ...map[string]str
 	// Send HTTP GET
 	log.Trace().
 		Str("url", url).
+		Interface("cookies", cookies).
 		Interface("headers", logheaders).
 		Bool("insecure", insecure).
 		Msg("HTTP GET")
@@ -125,7 +132,8 @@ func HTTPGet(url string, insecure bool, params string, headers ...map[string]str
 
 // HTTPPost performs an HTTP POST to the target URL
 // and includes auth parameters, ignoring certificates, etc
-func HTTPPost(url string, insecure bool, payload []byte, params string, headers ...map[string]string) ([]byte, error) {
+
+func HTTPPost(url string, insecure bool, payload []byte, params string, headers ...map[string]string) ([]byte, []*http.Cookie, error) {
 	// Append HTTP params if any
 	if len(params) > 0 {
 		url = url + params
@@ -146,7 +154,7 @@ func HTTPPost(url string, insecure bool, payload []byte, params string, headers 
 		// Setup new HTTP Request
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(payload))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// Add headers
@@ -200,7 +208,7 @@ func HTTPPost(url string, insecure bool, payload []byte, params string, headers 
 					Int("max_tries", 6).
 					Err(err).
 					Msg("HTTP Request failed, retries exceeded")
-				return nil, err
+				return nil, nil, err
 			}
 			log.Warn().
 				Int("attempt", retry).
@@ -217,18 +225,28 @@ func HTTPPost(url string, insecure bool, payload []byte, params string, headers 
 	// Read response body
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	log.Trace().
-		RawJSON("body", body).
-		Int("status_code", response.StatusCode).
-		Msg("HTTP Response")
+	// Read response cookies
+	cookies := response.Cookies()
+
+	if json.Valid(body) {
+		log.Trace().
+			RawJSON("body", body).
+			Int("status_code", response.StatusCode).
+			Msg("HTTP Response")
+	} else {
+		log.Trace().
+			Interface("body", string(body)).
+			Int("status_code", response.StatusCode).
+			Msg("HTTP Response")
+	}
 
 	// Check status codes
 	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return body, fmt.Errorf("failed to send request, got status code %v", response.StatusCode)
+		return body, cookies, fmt.Errorf("failed to send request, got status code %v", response.StatusCode)
 	}
 
-	return body, nil
+	return body, cookies, nil
 }

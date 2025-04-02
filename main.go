@@ -17,6 +17,7 @@ import (
 	"github.com/0x2142/frigate-notify/api"
 	"github.com/0x2142/frigate-notify/config"
 	"github.com/0x2142/frigate-notify/events"
+	"github.com/0x2142/frigate-notify/frigate"
 	"github.com/0x2142/frigate-notify/notifier"
 	"github.com/0x2142/frigate-notify/util"
 )
@@ -100,6 +101,8 @@ func main() {
 	config.ConfigFile = configFile
 	config.Load()
 
+	frigate.ValidateFrigateConnectivity()
+
 	notifier.TemplateFiles = NotifTemplates
 
 	// Set up monitor
@@ -107,7 +110,7 @@ func main() {
 		log.Debug().Msg("App monitoring enabled.")
 		go func() {
 			for {
-				_, err := util.HTTPGet(config.ConfigData.Monitor.URL, config.ConfigData.Monitor.Insecure, "")
+				_, err := util.HTTPGet(config.ConfigData.Monitor.URL, config.ConfigData.Monitor.Insecure, "", nil)
 				if err != nil {
 					config.Internal.Status.Monitor = err.Error()
 					log.Warn().

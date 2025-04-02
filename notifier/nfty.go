@@ -62,7 +62,7 @@ func SendNtfyPush(event models.Event, snapshot io.Reader, provider notifMeta) {
 
 	headers = renderHTTPKV(headers, event, "headers", "Ntfy")
 
-	resp, err := util.HTTPPost(NtfyURL, profile.Insecure, attachment, "", headers...)
+	resp, _, err := util.HTTPPost(NtfyURL, profile.Insecure, attachment, "", headers...)
 	if err != nil {
 		log.Warn().
 			Str("event_id", event.ID).

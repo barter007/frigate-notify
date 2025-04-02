@@ -166,7 +166,7 @@ func GetSnapshot(eventID string) io.Reader {
 	max_attempts := config.ConfigData.Alerts.General.MaxSnapRetry
 	for attempts < max_attempts {
 		var err error
-		response, err = util.HTTPGet(url.String(), config.ConfigData.Frigate.Insecure, "", config.ConfigData.Frigate.Headers...)
+		response, err = util.HTTPGet(url.String(), config.ConfigData.Frigate.Insecure, "", nil, config.ConfigData.Frigate.Headers...)
 		if err != nil {
 			attempts += 1
 			if err.Error() == "404" {

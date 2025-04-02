@@ -1,11 +1,15 @@
 package models
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 // Store internal-use only info
 type InternalConfig struct {
 	AppVersion     string
 	FrigateVersion int
+	FrigateCookies []*http.Cookie //used to store the frigate_token cookie
 	Status         Status
 }
 

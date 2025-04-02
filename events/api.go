@@ -2,52 +2,28 @@ package events
 
 import (
 	"encoding/json"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/0x2142/frigate-notify/config"
+	"github.com/0x2142/frigate-notify/frigate"
 	"github.com/0x2142/frigate-notify/models"
-	"github.com/0x2142/frigate-notify/util"
 )
 
 // LastQueryTime tracks the timestamp of the last event seen
 var LastQueryTime float64 = float64(time.Now().Unix())
 
+// QueryAPI queries the Frigate API for new events or reviews
 func QueryAPI() {
 	appmode := strings.ToLower(config.ConfigData.App.Mode)
-	var params string
-	if config.ConfigData.Frigate.WebAPI.TestMode {
-		// For testing, pull 1 event immediately
-		params = "?include_thumbnails=0&limit=1"
-	} else {
-		// Check for any events after last query time
-		params = "?include_thumbnails=0&after=" + strconv.FormatFloat(LastQueryTime, 'f', 6, 64)
-	}
 
-	var uri string
-	if appmode == "reviews" {
-		uri = "/api/review"
-	} else {
-		uri = "/api/events"
-	}
-
-	url := config.ConfigData.Frigate.Server + uri + params
-	log.Debug().Msgf("Checking for new %s...", appmode)
-
-	// Query API for reviews or events
-	response, err := util.HTTPGet(url, config.ConfigData.Frigate.Insecure, "", config.ConfigData.Frigate.Headers...)
+	response, err := frigate.GetEventsOrReviews(LastQueryTime)
 	if err != nil {
-		config.Internal.Status.Health = "frigate webapi unreachable"
-		config.Internal.Status.Frigate.API = "unreachable"
-		log.Error().
-			Err(err).
-			Msgf("Cannot get %s from %s", appmode, url)
+		log.Error().Err(err).Msgf("Error getting %s", appmode)
+		return
 	}
-	config.Internal.Status.Health = "ok"
-	config.Internal.Status.Frigate.API = "ok"
 
 	switch appmode {
 	case "reviews":
@@ -76,5 +52,4 @@ func QueryAPI() {
 			processEvent(event)
 		}
 	}
-
 }
