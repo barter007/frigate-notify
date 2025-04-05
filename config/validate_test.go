@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/0x2142/frigate-notify/models"
@@ -9,14 +10,22 @@ import (
 func TestValidateAppMode(t *testing.T) {
 	config := Config{Frigate: &models.Frigate{}}
 
-	// Check good config
+	// Check good config #1
 	config.App.Mode = "reviews"
-	Internal.FrigateVersion = 14
 	result := config.validateAppMode()
 	expected := 0
 	if len(result) != expected {
 		t.Errorf("Expected: %v error(s), Got: %v", expected, result)
 	}
+
+	// Check good config #2
+	config.App.Mode = "events"
+	result = config.validateAppMode()
+	expected = 0
+	if len(result) != expected {
+		t.Errorf("Expected: %v error(s), Got: %v", expected, result)
+	}
+
 	// Check bad config
 	config.App.Mode = "asdf"
 	result = config.validateAppMode()
@@ -24,14 +33,128 @@ func TestValidateAppMode(t *testing.T) {
 	if len(result) != expected {
 		t.Errorf("Expected: error, Got: %v", result)
 	}
+}
 
-	// Check incompatible version
-	config.App.Mode = "reviews"
-	Internal.FrigateVersion = 13
-	result = config.validateAppMode()
+func TestValidateFrigateServerSettings(t *testing.T) {
+	config := Config{Frigate: &models.Frigate{}, Alerts: &models.Alerts{}}
+
+	//test Frigate Server with 'http://' prefix
+	frigateServer := "http://server"
+	config.Frigate.Server = frigateServer
+
+	result := config.validateFrigateServerSettings()
+
+	expected := 0
+	if len(result) != expected {
+		t.Errorf("Expected: %v error(s), Got: %v", expected, result)
+	}
+	if config.Frigate.Server != frigateServer {
+		t.Errorf("Expected config.Frigate.Server to be '%s' but got '%s'", frigateServer, config.Frigate.Server)
+	}
+
+	//test Frigate Server with 'https://' prefix
+	frigateServer = "https://server"
+	config.Frigate.Server = frigateServer
+
+	result = config.validateFrigateServerSettings()
+
+	expected = 0
+	if len(result) != expected {
+		t.Errorf("Expected: %v error(s), Got: %v", expected, result)
+	}
+	if config.Frigate.Server != frigateServer {
+		t.Errorf("Expected config.Frigate.Server to be '%s' but got '%s'", frigateServer, config.Frigate.Server)
+	}
+
+	//test Frigate Server without 'http://' or 'https//' prefix
+	frigateServer = "servername"
+	config.Frigate.Server = frigateServer
+
+	result = config.validateFrigateServerSettings()
+	frigateServer = fmt.Sprintf("http://%s", frigateServer)
+	expected = 0
+	if len(result) != expected {
+		t.Errorf("Expected: %v error(s), Got: %v", expected, result)
+	}
+	if config.Frigate.Server != frigateServer {
+		t.Errorf("Expected config.Frigate.Server to be '%s' but got '%s'", frigateServer, config.Frigate.Server)
+	}
+
+	//test Frigate AuthEnabled = true with username and password
+	config.Frigate.AuthEnabled = true
+	config.Frigate.Username = "username"
+	config.Frigate.Password = "password"
+	result = config.validateFrigateServerSettings()
+	expected = 0
+	if len(result) != expected {
+		t.Errorf("Expected no errors with AuthEnabled with both username and password provided but got : %v error(s), Got: %v", expected, result)
+	}
+
+	//test Frigate AuthEnabled = true with provided username and with empty password
+	config.Frigate.AuthEnabled = true
+	config.Frigate.Username = "username"
+	config.Frigate.Password = ""
+	result = config.validateFrigateServerSettings()
 	expected = 1
 	if len(result) != expected {
-		t.Errorf("Expected: error, Got: %v", result)
+		t.Errorf("Expected : %v error(s), Got: %v", expected, result)
+	}
+
+	//test Frigate AuthEnabled = true with empty username and a provided password
+	config.Frigate.AuthEnabled = true
+	config.Frigate.Username = ""
+	config.Frigate.Password = "password"
+	result = config.validateFrigateServerSettings()
+	expected = 1
+	if len(result) != expected {
+		t.Errorf("Expected : %v error(s), Got: %v", expected, result)
+	}
+	config.Frigate.AuthEnabled = false
+
+	//test Empty Frigate Public URL
+	config.Frigate.Server = "http://server"
+	config.Frigate.PublicURL = ""
+	result = config.validateFrigateServerSettings()
+	expected = 0
+	if len(result) != expected {
+		t.Errorf("Expected : %v error(s), Got: %v", expected, result)
+	}
+	if config.Frigate.PublicURL != config.Frigate.Server {
+		t.Errorf("Expected config.Frigate.Server to be '%s' but got '%s'", frigateServer, config.Frigate.PublicURL)
+	}
+
+	//test Frigate Public URL with valid Public Url (with http:// prefix)
+	config.Frigate.Server = "http://server"
+	expectedPublicUrl := "http://publicurl"
+	config.Frigate.PublicURL = expectedPublicUrl
+	result = config.validateFrigateServerSettings()
+	expected = 0
+	if len(result) != expected {
+		t.Errorf("Expected : %v error(s), Got: %v", expected, result)
+	}
+	if config.Frigate.PublicURL != expectedPublicUrl {
+		t.Errorf("Expected config.Frigate.PublicURL to be '%s' but got '%s'", expectedPublicUrl, config.Frigate.PublicURL)
+	}
+
+	//test Frigate Public URL with valid Public Url (with https:// prefix)
+	config.Frigate.Server = "http://server"
+	expectedPublicUrl = "https://publicurl"
+	config.Frigate.PublicURL = expectedPublicUrl
+	result = config.validateFrigateServerSettings()
+	expected = 0
+	if len(result) != expected {
+		t.Errorf("Expected : %v error(s), Got: %v", expected, result)
+	}
+	if config.Frigate.PublicURL != expectedPublicUrl {
+		t.Errorf("Expected config.Frigate.PublicURL to be '%s' but got '%s'", expectedPublicUrl, config.Frigate.PublicURL)
+	}
+
+	//test Frigate Public URL with invalid Public Url (missing http)
+	config.Frigate.PublicURL = "publicurl"
+	result = config.validateFrigateServerSettings()
+	expected = 1
+	if len(result) != expected {
+		t.Errorf("Expected : %v error(s), Got: %v", expected, result)
 	}
 }
 
@@ -43,7 +166,7 @@ func TestValidateAPI(t *testing.T) {
 	// Validate default port set
 	config.validateAPI()
 	if config.App.API.Port != 8000 {
-		t.Errorf("Expected: 80, Got: %v", config.App.API.Port)
+		t.Errorf("Expected: 8000, Got: %v", config.App.API.Port)
 
 	}
 

@@ -249,7 +249,8 @@ func (c *Config) validateFrigatePolling() []string {
 }
 
 func (c *Config) validateFrigateServerSettings() []string {
-	var connectivityErrors []string
+
+	frigateServerSettingsErrors := []string{}
 
 	url := c.Frigate.Server
 
@@ -257,13 +258,22 @@ func (c *Config) validateFrigateServerSettings() []string {
 	if !strings.Contains(url, "http://") && !strings.Contains(url, "https://") {
 		log.Warn().Msgf("No protocol specified on Frigate server URL, so we'll try http://%s. If this is incorrect, please adjust the config file.", c.Frigate.Server)
 		c.Frigate.Server = fmt.Sprintf("http://%s", url)
-		url = c.Frigate.Server
+	}
+
+	// Check if Frigate.Auth is enabled, make sure we have a user and password
+	if c.Frigate.AuthEnabled {
+		if c.Frigate.Username == "" {
+			frigateServerSettingsErrors = append(frigateServerSettingsErrors, "When Frigate AuthEnabled = true, you must specify a Frigate Username")
+		}
+		if c.Frigate.Password == "" {
+			frigateServerSettingsErrors = append(frigateServerSettingsErrors, "When Frigate AuthEnabled = true, you must specify a Frigate Password")
+		}
 	}
 
 	// Check Public / External URL if set
 	if c.Frigate.PublicURL != "" {
 		if !strings.Contains(c.Frigate.PublicURL, "http://") && !strings.Contains(c.Frigate.PublicURL, "https://") {
-			connectivityErrors = append(connectivityErrors, "Public URL must include http:// or https://")
+			frigateServerSettingsErrors = append(frigateServerSettingsErrors, "Public URL must include http:// or https://")
 		}
 	} else {
 		// If Public URL not explicitly set, use local Frigate URL
@@ -272,10 +282,10 @@ func (c *Config) validateFrigateServerSettings() []string {
 
 	// Check HTTP header template syntax
 	if msg := validateTemplate("Frigate HTTP Headers", c.Alerts.General.Title); msg != "" {
-		connectivityErrors = append(connectivityErrors, msg)
+		frigateServerSettingsErrors = append(frigateServerSettingsErrors, msg)
 	}
 
-	return connectivityErrors
+	return frigateServerSettingsErrors
 }
 
 func (c *Config) validateMQTT() []string {
